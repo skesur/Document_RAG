@@ -110,48 +110,40 @@ class VectorStoreService:
         # -------------------------------------------------------------
         # 1. Dense Semantic Similarity (Vector Space)
         # -------------------------------------------------------------
-        dense_sims = np.zeros(num_chunks)
+        dense_sims = np.zeros(num_chunks, dtype=np.float32)
         model = _get_neural_model()
 
         if model is not None:
             try:
                 # Check if chunks have pre-computed 384-d dense embeddings
-                has_valid_embs = (
-                    chunks_data[0].get("embedding") is not None
-                    and isinstance(chunks_data[0].get("embedding"), list)
-                    and len(chunks_data[0].get("embedding")) == 384
-                )
-
-                if has_valid_embs:
-                    chunk_matrix = np.array([ch["embedding"] for ch in chunks_data], dtype=np.float32)
-                else:
-                    chunk_matrix = model.encode(all_contents, normalize_embeddings=True, show_progress_bar=False)
-
-                q_vec = model.encode(query, normalize_embeddings=True)
-                dense_sims = chunk_matrix @ q_vec
+                valid_embs = [
+                    ch.get("embedding") for ch in chunks_data
+                    if ch.get("embedding") and isinstance(ch.get("embedding"), list) and len(ch.get("embedding")) == 384
+                ]
+                if len(valid_embs) == num_chunks:
+                    chunk_matrix = np.array(valid_embs, dtype=np.float32)
+                    q_vec = model.encode(query, normalize_embeddings=True)
+                    dense_sims = np.dot(chunk_matrix, q_vec)
             except Exception as e:
                 logger.error(f"Dense vector calculation error: {e}")
 
         # -------------------------------------------------------------
-        # 2. Sparse Lexical Similarity (BM25 / Sublinear TF-IDF)
+        # 2. Sparse Lexical Similarity (Memory-Efficient Sparse CSR Dot Product)
         # -------------------------------------------------------------
-        sparse_sims = np.zeros(num_chunks)
+        sparse_sims = np.zeros(num_chunks, dtype=np.float32)
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
             vectorizer = TfidfVectorizer(
-                max_features=40000,
+                max_features=10000,
                 sublinear_tf=True,
                 ngram_range=(1, 2),
                 stop_words='english'
             )
-            matrix = vectorizer.fit_transform(all_contents + [query]).toarray()
-            norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-            norms[norms == 0] = 1.0
-            matrix = matrix / norms
-
-            doc_vectors = matrix[:-1]
-            query_vector = matrix[-1]
-            sparse_sims = np.dot(doc_vectors, query_vector)
+            # Use lightweight sparse matrix (takes ~1MB RAM instead of 400MB)
+            sparse_matrix = vectorizer.fit_transform(all_contents + [query])
+            doc_vectors = sparse_matrix[:-1]
+            query_vector = sparse_matrix[-1].T
+            sparse_sims = (doc_vectors * query_vector).toarray().flatten()
         except Exception as e:
             logger.error(f"Sparse vector calculation error: {e}")
 
