@@ -2,7 +2,7 @@ services:
   - type: web
     name: document-rag
     env: python
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    buildCommand: "pip install -r requirements.txt && python -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')\" && python manage.py collectstatic --noinput"
     startCommand: "python manage.py migrate --noinput && gunicorn document_rag.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
     envVars:
       - key: DEBUG

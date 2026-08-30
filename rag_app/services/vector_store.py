@@ -17,6 +17,11 @@ def _get_neural_model():
     global _GLOBAL_NEURAL_MODEL
     if _GLOBAL_NEURAL_MODEL is None:
         try:
+            try:
+                import torch
+                torch.set_num_threads(2)
+            except Exception:
+                pass
             from sentence_transformers import SentenceTransformer
             model_name = getattr(settings, 'EMBEDDING_MODEL_NAME', 'all-MiniLM-L6-v2')
             _GLOBAL_NEURAL_MODEL = SentenceTransformer(model_name)
@@ -42,12 +47,23 @@ class VectorStoreService:
         model = _get_neural_model()
         if model is not None:
             try:
-                embs = model.encode(
-                    texts,
-                    batch_size=64,
-                    normalize_embeddings=True,
-                    show_progress_bar=False
-                )
+                try:
+                    import torch
+                    with torch.inference_mode():
+                        embs = model.encode(
+                            texts,
+                            batch_size=32,
+                            normalize_embeddings=True,
+                            show_progress_bar=False,
+                            convert_to_numpy=True
+                        )
+                except Exception:
+                    embs = model.encode(
+                        texts,
+                        batch_size=32,
+                        normalize_embeddings=True,
+                        show_progress_bar=False
+                    )
                 return embs.tolist()
             except Exception as e:
                 logger.error(f"Neural embedding generation error: {e}")
