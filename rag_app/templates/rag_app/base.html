@@ -1,0 +1,135 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DOCUMENT_RAG{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'rag_app/css/cyberpunk.css' %}">
+    <!-- Marked.js for full markdown and code rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="cyber-grid-bg"></div>
+
+    <!-- Top Navigation Bar -->
+    <header class="cyber-header">
+        <a href="{% url 'rag_app:index' %}" class="brand-logo">
+            <span>DOCUMENT</span><span class="highlight">_RAG</span>
+        </a>
+
+        <div class="hud-status-bar">
+            {% block header_actions %}{% endblock %}
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-viewport">
+        {% csrf_token %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Cyberpunk Global Confirmation & Alert Modal -->
+    <div id="cyber-dialog-overlay" class="cyber-modal-overlay" style="display: none;">
+        <div class="cyber-modal-card cyber-cut" style="border-color: var(--neon-pink); box-shadow: 0 0 25px rgba(255, 0, 85, 0.3);">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+                <span id="cyber-dialog-icon" style="font-size: 1.3rem;">⚠️</span>
+                <h3 id="cyber-dialog-title" style="font-family: var(--font-display); color: var(--neon-pink); font-size: 1.05rem; margin: 0; letter-spacing: 1px;">
+                    CONFIRM DELETION
+                </h3>
+            </div>
+            <p id="cyber-dialog-message" style="color: var(--text-bright); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.4rem;">
+                Are you sure you want to delete this document?
+            </p>
+            <div style="display: flex; justify-content: flex-end; gap: 0.8rem;">
+                <button id="cyber-dialog-cancel" class="cyber-btn" style="padding: 0.45rem 1rem; border-color: var(--text-muted); color: var(--text-muted);">
+                    CANCEL
+                </button>
+                <button id="cyber-dialog-confirm" class="cyber-btn cyber-btn-pink" style="padding: 0.45rem 1.2rem; font-weight: 600;">
+                    DELETE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Cyberpunk Dialog System
+        window.cyberConfirm = function(message, title = 'CONFIRM DELETION', icon = '⚠️') {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('cyber-dialog-overlay');
+                const titleEl = document.getElementById('cyber-dialog-title');
+                const msgEl = document.getElementById('cyber-dialog-message');
+                const iconEl = document.getElementById('cyber-dialog-icon');
+                const confirmBtn = document.getElementById('cyber-dialog-confirm');
+                const cancelBtn = document.getElementById('cyber-dialog-cancel');
+
+                if (!overlay) {
+                    resolve(window.confirm(message));
+                    return;
+                }
+
+                titleEl.innerText = title;
+                titleEl.style.color = 'var(--neon-pink)';
+                msgEl.innerText = message;
+                iconEl.innerText = icon;
+                cancelBtn.style.display = 'inline-flex';
+                confirmBtn.innerText = 'DELETE';
+                confirmBtn.className = 'cyber-btn cyber-btn-pink';
+
+                overlay.style.display = 'flex';
+
+                function cleanup(result) {
+                    overlay.style.display = 'none';
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+
+                function onConfirm() { cleanup(true); }
+                function onCancel() { cleanup(false); }
+
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        };
+
+        window.cyberAlert = function(message, title = 'SYSTEM NOTIFICATION', icon = 'ℹ️') {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('cyber-dialog-overlay');
+                const titleEl = document.getElementById('cyber-dialog-title');
+                const msgEl = document.getElementById('cyber-dialog-message');
+                const iconEl = document.getElementById('cyber-dialog-icon');
+                const confirmBtn = document.getElementById('cyber-dialog-confirm');
+                const cancelBtn = document.getElementById('cyber-dialog-cancel');
+
+                if (!overlay) {
+                    window.alert(message);
+                    resolve();
+                    return;
+                }
+
+                titleEl.innerText = title;
+                titleEl.style.color = 'var(--neon-cyan)';
+                msgEl.innerText = message;
+                iconEl.innerText = icon;
+                cancelBtn.style.display = 'none';
+                confirmBtn.innerText = 'OK';
+                confirmBtn.className = 'cyber-btn';
+
+                overlay.style.display = 'flex';
+
+                function onConfirm() {
+                    overlay.style.display = 'none';
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    resolve();
+                }
+
+                confirmBtn.addEventListener('click', onConfirm);
+            });
+        };
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

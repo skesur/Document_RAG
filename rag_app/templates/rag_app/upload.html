@@ -1,0 +1,100 @@
+{% extends 'rag_app/base.html' %}
+{% load static %}
+
+{% block title %}UPLOAD // DOCUMENT_RAG{% endblock %}
+{% block body_class %}page-upload-body{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    
+    <!-- Hero Header -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="font-family: var(--font-display); font-size: 2.2rem; color: var(--neon-cyan); letter-spacing: 2px; text-shadow: 0 0 12px rgba(0,240,255,0.4);">
+            DOCUMENT<span style="color: var(--neon-pink);">_RAG</span>
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.3rem;">
+            Upload your document and ask questions with fast, grounded answers.
+        </p>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="cyber-card cyber-cut" style="margin-bottom: 2rem;">
+        <div class="cyber-dropzone cyber-cut" id="dropzone">
+            <div class="dropzone-icon">📁</div>
+            <h3 style="font-family: var(--font-display); color: var(--text-bright); font-size: 1.1rem; margin-bottom: 0.3rem;">
+                DROP YOUR FILE HERE OR <span style="color: var(--neon-cyan); text-decoration: underline;">BROWSE</span>
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+                Supports PDF, TXT, Markdown, CSV, JSON (Up to 50MB)
+            </p>
+            <input type="file" id="file-input" style="display: none;" accept=".pdf,.txt,.md,.markdown,.csv,.json,.log,.py">
+        </div>
+
+        <!-- Clean Matrix Progress Bar -->
+        <div class="matrix-scanner cyber-cut" id="matrix-scanner">
+            <div id="upload-status" style="color: var(--neon-cyan); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.5px;">
+                Processing and indexing document...
+            </div>
+            <div class="cyber-progress-track">
+                <div class="cyber-progress-fill" id="progress-bar"></div>
+            </div>
+            <div id="scanner-logs" style="margin-top: 0.8rem; font-size: 0.8rem;"></div>
+        </div>
+    </div>
+
+    <!-- Uploaded Documents List -->
+    <div class="cyber-card cyber-cut">
+        <h2 style="font-family: var(--font-display); font-size: 1.1rem; color: var(--neon-cyan); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>UPLOADED DOCUMENTS ({{ documents.count }})</span>
+        </h2>
+
+        {% if documents %}
+        <div style="display: flex; flex-direction: column; gap: 0.7rem;">
+            {% for doc in documents %}
+            <div style="background: rgba(10, 14, 24, 0.8); border: 1px solid var(--border-cyan); padding: 0.8rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 4px;" class="cyber-cut">
+                <div style="display: flex; align-items: center; gap: 0.8rem; min-width: 0;">
+                    <span style="background: rgba(0,240,255,0.12); color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 2px 7px; font-size: 0.72rem; text-transform: uppercase; font-family: var(--font-mono); flex-shrink: 0;">
+                        {{ doc.file_type }}
+                    </span>
+                    <div style="min-width: 0;">
+                        <h3 style="color: var(--text-bright); font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;">
+                            {{ doc.title }}
+                        </h3>
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">{{ doc.formatted_size }} • {{ doc.total_chunks }} chunks</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                    {% if doc.status == 'indexed' %}
+                    <a href="{% url 'rag_app:chat' doc.id %}" class="cyber-btn" style="padding: 0.4rem 0.9rem; font-size: 0.78rem;">
+                        OPEN CHAT 💬
+                    </a>
+                    {% endif %}
+                    <button class="cyber-btn cyber-btn-pink btn-delete-doc" data-doc-id="{{ doc.id }}" data-doc-title="{{ doc.title }}" style="padding: 0.4rem 0.7rem; font-size: 0.78rem;" title="Delete Document">
+                        ✕
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+            <p>No documents uploaded yet.</p>
+            <p style="font-size: 0.85rem; color: var(--neon-cyan); margin-top: 0.3rem;">Upload a document above to get started.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Privacy & Security Assurance Card -->
+    <div style="margin-top: 1.5rem; text-align: center; font-size: 0.78rem; color: #8e9bb0; line-height: 1.5; padding: 0.8rem 1.2rem; background: rgba(10, 14, 24, 0.6); border: 1px solid var(--border-cyan); border-radius: 4px;" class="cyber-cut">
+        <span style="color: var(--neon-cyan); font-weight: 600;">🔒 Enterprise Privacy & Security Guarantee:</span> 
+        All uploaded documents are processed securely and used exclusively for your session. Answers are generated via the Groq API strictly from your document context. 
+        <strong>Zero AI Model Training:</strong> Your files and queries are never used to train AI models. You have full control to permanently delete your data at any time.
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'rag_app/js/upload.js' %}"></script>
+{% endblock %}
