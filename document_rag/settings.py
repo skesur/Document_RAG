@@ -108,10 +108,12 @@ STATICFILES_DIRS = [
     BASE_DIR / 'rag_app' / 'static',
 ]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+os.makedirs(STATIC_ROOT, exist_ok=True)
 
 # Media files (Uploaded documents)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # File upload size limits (up to 50MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
