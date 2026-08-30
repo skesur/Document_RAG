@@ -108,27 +108,7 @@ class VectorStoreService:
         num_chunks = len(chunks_data)
 
         # -------------------------------------------------------------
-        # 1. Dense Semantic Similarity (Vector Space)
-        # -------------------------------------------------------------
-        dense_sims = np.zeros(num_chunks, dtype=np.float32)
-        model = _get_neural_model()
-
-        if model is not None:
-            try:
-                # Check if chunks have pre-computed 384-d dense embeddings
-                valid_embs = [
-                    ch.get("embedding") for ch in chunks_data
-                    if ch.get("embedding") and isinstance(ch.get("embedding"), list) and len(ch.get("embedding")) == 384
-                ]
-                if len(valid_embs) == num_chunks:
-                    chunk_matrix = np.array(valid_embs, dtype=np.float32)
-                    q_vec = model.encode(query, normalize_embeddings=True)
-                    dense_sims = np.dot(chunk_matrix, q_vec)
-            except Exception as e:
-                logger.error(f"Dense vector calculation error: {e}")
-
-        # -------------------------------------------------------------
-        # 2. Sparse Lexical Similarity (Memory-Efficient Sparse CSR Dot Product)
+        # 1. Sparse Lexical & Semantic Similarity (Memory-Efficient CSR Dot Product)
         # -------------------------------------------------------------
         sparse_sims = np.zeros(num_chunks, dtype=np.float32)
         try:
@@ -139,24 +119,46 @@ class VectorStoreService:
                 ngram_range=(1, 2),
                 stop_words='english'
             )
-            # Use lightweight sparse matrix (takes ~1MB RAM instead of 400MB)
             sparse_matrix = vectorizer.fit_transform(all_contents + [query])
             doc_vectors = sparse_matrix[:-1]
             query_vector = sparse_matrix[-1].T
-            sparse_sims = (doc_vectors * query_vector).toarray().flatten()
+            sparse_sims = doc_vectors.dot(query_vector).toarray().flatten()
         except Exception as e:
             logger.error(f"Sparse vector calculation error: {e}")
+
+        # -------------------------------------------------------------
+        # 2. Dense Semantic Similarity (Vector Space)
+        # -------------------------------------------------------------
+        dense_sims = np.zeros(num_chunks, dtype=np.float32)
+        if num_chunks <= 50:
+            model = _get_neural_model()
+            if model is not None:
+                try:
+                    valid_embs = [
+                        ch.get("embedding") for ch in chunks_data
+                        if ch.get("embedding") and isinstance(ch.get("embedding"), list) and len(ch.get("embedding")) == 384
+                    ]
+                    if len(valid_embs) == num_chunks:
+                        chunk_matrix = np.array(valid_embs, dtype=np.float32)
+                        q_vec = model.encode(query, normalize_embeddings=True)
+                        dense_sims = np.dot(chunk_matrix, q_vec)
+                except Exception as e:
+                    logger.error(f"Dense vector calculation error: {e}")
 
         # -------------------------------------------------------------
         # 3. Reciprocal Rank & Hybrid Score Fusion
         # -------------------------------------------------------------
         scored_chunks = []
+        has_dense = (num_chunks <= 50 and np.max(dense_sims) > 0)
+
         for i, item in enumerate(chunks_data):
             d_score = float(dense_sims[i]) if i < len(dense_sims) else 0.0
             s_score = float(sparse_sims[i]) if i < len(sparse_sims) else 0.0
 
-            # 70% Dense Neural Semantics + 30% Exact Lexical Match
-            hybrid_score = (0.70 * d_score) + (0.30 * s_score)
+            if has_dense:
+                hybrid_score = (0.70 * d_score) + (0.30 * s_score)
+            else:
+                hybrid_score = s_score
 
             scored_chunks.append({
                 **item,
