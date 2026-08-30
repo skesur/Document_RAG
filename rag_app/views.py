@@ -41,17 +41,11 @@ def index_view(request):
     Main Cyberpunk Document Matrix & Upload Terminal.
     """
     documents = Document.objects.all().order_by('-created_at')
-    active_provider = getattr(settings, 'LLM_PROVIDER', 'auto')
-    has_gemini = bool(getattr(settings, 'GEMINI_API_KEY', '') or os.environ.get('GEMINI_API_KEY'))
     has_groq = bool(getattr(settings, 'GROQ_API_KEY', '') or os.environ.get('GROQ_API_KEY'))
-    has_openai = bool(getattr(settings, 'OPENAI_API_KEY', '') or os.environ.get('OPENAI_API_KEY'))
 
     context = {
         'documents': documents,
-        'active_provider': active_provider,
-        'has_gemini': has_gemini,
         'has_groq': has_groq,
-        'has_openai': has_openai,
         'embedding_model': getattr(settings, 'EMBEDDING_MODEL_NAME', 'all-MiniLM-L6-v2'),
     }
     return render(request, 'rag_app/upload.html', context)

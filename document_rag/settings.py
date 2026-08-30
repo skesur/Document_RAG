@@ -26,16 +26,15 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [
-    host.strip() for host in os.environ.get(
-        'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,*'
-    ).split(',') if host.strip()
-]
+ALLOWED_HOSTS = ['*']
 
-# CSRF Trusted Origins for deployments (e.g. Render / Railway / Custom domains)
+# CSRF Trusted Origins for deployments
 CSRF_TRUSTED_ORIGINS = [
-    f"https://{host}" for host in ALLOWED_HOSTS if host not in ('*', 'localhost', '127.0.0.1', '0.0.0.0')
+    'https://*.onrender.com',
+    'https://*.render.com',
+    'https://localhost',
+    'http://localhost',
+    'http://127.0.0.1',
 ]
 
 # Application definition
@@ -108,7 +107,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'rag_app' / 'static',
 ]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Media files (Uploaded documents)
 MEDIA_URL = '/media/'
