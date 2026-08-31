@@ -4,7 +4,7 @@ import json
 import logging
 import httpx
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Generator
 from django.conf import settings
 from rag_app.services.vector_store import _get_neural_model
 
@@ -157,8 +157,44 @@ class LLMService:
         synthesized_answer = LLMService._synthesize_cohesive_passage(query, retrieved_chunks, document_obj)
         return synthesized_answer, "Dense Semantic Engine"
 
+    @staticmethod
+    def stream_response(
+        query: str,
+        retrieved_chunks: List[Dict[str, Any]],
+        document_obj: Any = None,
+        chat_history: List[Dict[str, str]] = None,
+        custom_api_key: str = None
+    ) -> Generator[str, None, None]:
+        """
+        Streams generated response token-by-token (ChatGPT/Claude style) from Groq LPUs.
+        """
+        groq_key = getattr(settings, 'GROQ_API_KEY', '') or os.environ.get('GROQ_API_KEY', '') or custom_api_key
+
+        context_blocks = []
+        for i, ch in enumerate(retrieved_chunks[:5]):
+            content = ch.get('content', '').strip()
+            page_info = f" (Page {ch.get('page_number')})" if ch.get('page_number') else ""
+            if content:
+                context_blocks.append(f"--- [Document Excerpt #{i + 1}{page_info}] ---\n{content}")
+        context_str = "\n\n".join(context_blocks)
+
+        if groq_key:
+            stream_gen = LLMService._stream_groq(query, context_str, groq_key, chat_history)
+            has_yielded = False
+            for token in stream_gen:
+                has_yielded = True
+                yield token
+            if has_yielded:
+                return
+
+        # Fallback to synchronous generation yielded in natural word bursts
+        fallback_text, _ = LLMService.generate_response(query, retrieved_chunks, document_obj, chat_history, custom_api_key)
+        words = re.split(r'(\s+)', fallback_text)
+        for w in words:
+            yield w
+
     # =========================================================================
-    # GROQ INFERENCE (High-Precision 120B / 70B / 27B LPU Models)
+    # GROQ SYNCHRONOUS INFERENCE
     # =========================================================================
     @staticmethod
     def _call_groq(query: str, context: str, api_key: str, chat_history: List[Dict[str, str]] = None) -> str:
@@ -177,7 +213,6 @@ class LLMService:
             "content": f"Document Context Excerpts:\n{context}\n\nUser Question: {query}"
         })
 
-        # High-performance Groq candidate models
         candidate_models = [
             "openai/gpt-oss-120b",
             "qwen/qwen3.6-27b",
@@ -216,6 +251,76 @@ class LLMService:
             except Exception as e:
                 logger.error(f"Groq API error with model {model}: {e}")
         return ""
+
+    # =========================================================================
+    # GROQ STREAMING INFERENCE (Token-by-token real-time generator)
+    # =========================================================================
+    @staticmethod
+    def _stream_groq(query: str, context: str, api_key: str, chat_history: List[Dict[str, str]] = None) -> Generator[str, None, None]:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        messages = [{"role": "system", "content": LLMService.SYSTEM_PROMPT}]
+
+        if chat_history:
+            for msg in chat_history[-4:]:
+                r = msg.get("role", "user")
+                c = msg.get("content", "")
+                if r in ["user", "assistant"] and c:
+                    messages.append({"role": r, "content": c})
+
+        messages.append({
+            "role": "user",
+            "content": f"Document Context Excerpts:\n{context}\n\nUser Question: {query}"
+        })
+
+        candidate_models = [
+            "openai/gpt-oss-120b",
+            "qwen/qwen3.6-27b",
+            "openai/gpt-oss-20b",
+            "groq/compound",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant"
+        ]
+
+        for model in candidate_models:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 2048,
+                "stream": True
+            }
+            try:
+                with httpx.Client(timeout=35.0) as client:
+                    with client.stream(
+                        "POST",
+                        url,
+                        json=payload,
+                        headers={
+                            "Authorization": f"Bearer {api_key.strip()}",
+                            "Content-Type": "application/json"
+                        }
+                    ) as resp:
+                        if resp.status_code == 200:
+                            for line in resp.iter_lines():
+                                if not line:
+                                    continue
+                                if line.startswith("data: "):
+                                    data_str = line[6:].strip()
+                                    if data_str == "[DONE]":
+                                        break
+                                    try:
+                                        chunk = json.loads(data_str)
+                                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                                        token = delta.get("content", "")
+                                        if token:
+                                            yield token
+                                    except Exception:
+                                        pass
+                            return
+                        else:
+                            logger.warning(f"Groq stream ({model}) HTTP {resp.status_code}")
+            except Exception as e:
+                logger.error(f"Groq stream error with model {model}: {e}")
 
     # =========================================================================
     # DENSE NEURAL SECTION SYNTHESIZER (80 MB Offline Fallback)

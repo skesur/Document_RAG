@@ -3,7 +3,7 @@ import json
 import logging
 import threading
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET, require_http_methods
 from django.conf import settings
@@ -160,6 +160,19 @@ def chat_ask_api(request, session_id):
             "sources": [],
             "provider": "System"
         }, status=status.HTTP_200_OK)
+
+    # Check if client requested streaming (?stream=true or Accept: text/event-stream)
+    is_stream = request.GET.get('stream') == 'true' or 'text/event-stream' in request.headers.get('Accept', '')
+
+    if is_stream:
+        def event_stream():
+            for event in RAGPipeline.stream_answer_query(session, user_query, custom_api_key=custom_api_key):
+                yield f"data: {json.dumps(event)}\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
     result = RAGPipeline.answer_query(session, user_query, custom_api_key=custom_api_key)
     return Response(result, status=status.HTTP_200_OK)

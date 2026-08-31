@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollToBottom();
     }
 
-    // Chat submit
+    // Chat submit with real-time word-by-word typewriter streaming (ChatGPT/Claude style)
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const query = queryInput.value.trim();
@@ -202,26 +202,129 @@ document.addEventListener('DOMContentLoaded', () => {
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 
         try {
-            const response = await fetch(`/api/chat/${sessionId}/ask/`, {
+            const response = await fetch(`/api/chat/${sessionId}/ask/?stream=true`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ 
-                    message: query
-                })
+                body: JSON.stringify({ message: query })
             });
-
-            const data = await response.json();
 
             if (typingIndicator) typingIndicator.style.display = 'none';
 
-            if (response.ok) {
-                appendMessage('assistant', data.answer, data.sources, data.provider);
-            } else {
-                appendMessage('assistant', `⚠️ ${data.error || 'Server error.'}`);
+            if (!response.ok) {
+                let errText = 'Server error.';
+                try {
+                    const errData = await response.json();
+                    errText = errData.error || errText;
+                } catch(e) {}
+                appendMessage('assistant', `⚠️ ${errText}`);
+                return;
             }
+
+            // Create streaming assistant message card
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-msg assistant';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'msg-avatar';
+            avatar.textContent = 'AI';
+
+            const body = document.createElement('div');
+            body.className = 'msg-body cyber-cut';
+
+            const badgeContainer = document.createElement('div');
+            body.appendChild(badgeContainer);
+
+            const msgText = document.createElement('div');
+            msgText.className = 'msg-text';
+            msgText.innerHTML = '<span class="typing-cursor">▌</span>';
+            body.appendChild(msgText);
+
+            const citeContainer = document.createElement('div');
+            body.appendChild(citeContainer);
+
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(body);
+            chatHistory.appendChild(msgDiv);
+            scrollToBottom();
+
+            // Stream reader loop
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let accumulatedText = '';
+            let sources = [];
+            let providerBadge = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop(); // keep remainder
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+                    try {
+                        const event = JSON.parse(trimmed.substring(6));
+
+                        if (event.type === 'meta') {
+                            providerBadge = event.provider;
+                            sources = event.sources || [];
+                            if (providerBadge) {
+                                badgeContainer.innerHTML = `<div class="model-provider-badge">⚡ ${providerBadge}</div>`;
+                            }
+                        } else if (event.type === 'token') {
+                            accumulatedText += event.token;
+                            msgText.innerHTML = renderMarkdown(accumulatedText) + '<span class="typing-cursor">▌</span>';
+                            scrollToBottom();
+                        } else if (event.type === 'done') {
+                            accumulatedText = event.answer || accumulatedText;
+                        }
+                    } catch (err) {
+                        console.warn("SSE parse warning", err);
+                    }
+                }
+            }
+
+            // Finalize message rendering
+            msgText.innerHTML = renderMarkdown(accumulatedText);
+
+            if (sources && sources.length > 0) {
+                const citeId = `packet-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                citeContainer.className = 'citation-container';
+                citeContainer.innerHTML = `
+                    <div class="citation-header citation-toggle-btn" data-target="${citeId}">
+                        <span class="arrow">▶</span>
+                        <span>Sources (${sources.length})</span>
+                    </div>
+                    <div class="citation-packets" id="${citeId}" style="display:none;">
+                        ${sources.map(src => `
+                            <div class="data-packet-chip">
+                                <div class="packet-meta">
+                                    <span>Excerpt #${src.chunk_index} ${src.page_number ? `(Page ${src.page_number})` : ''}</span>
+                                </div>
+                                <div class="packet-snippet">${src.snippet}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Highlight syntax
+            if (typeof hljs !== 'undefined') {
+                msgDiv.querySelectorAll('pre code').forEach(block => {
+                    hljs.highlightElement(block);
+                });
+            }
+
+            setupSourceToggles(msgDiv);
+            scrollToBottom();
+
         } catch (err) {
             if (typingIndicator) typingIndicator.style.display = 'none';
             appendMessage('assistant', `⚠️ Network error: ${err.message}`);
