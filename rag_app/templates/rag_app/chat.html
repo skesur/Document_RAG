@@ -64,13 +64,21 @@
         <div class="chat-history" id="chat-history">
             
             {% if not messages %}
-            <!-- Clean Empty State Banner -->
-            <div class="chat-msg assistant">
-                <div class="msg-avatar">AI</div>
-                <div class="msg-body cyber-cut">
-                    <div class="msg-text">
-                        <p>Ask anything about <strong>{{ document.title }}</strong>.</p>
-                    </div>
+            <!-- Modern Interactive Welcome Hero -->
+            <div class="chat-welcome-hero" id="chat-welcome-hero">
+                <div class="welcome-icon">⚡</div>
+                <h3 class="welcome-title">{{ document.title }}</h3>
+                <p class="welcome-subtitle">Document indexed with <strong>{{ document.total_chunks }} chunks</strong>. Ask questions, explore topics, or request detailed explanations.</p>
+                <div class="welcome-actions">
+                    <button type="button" class="welcome-chip" data-query="What is the main summary and purpose of this document?">
+                        <span>📝</span> What is this document about?
+                    </button>
+                    <button type="button" class="welcome-chip" data-query="Explain the core concepts and topics covered in this document.">
+                        <span>💡</span> Explain core concepts
+                    </button>
+                    <button type="button" class="welcome-chip" data-query="Give me key practical examples and code from this document.">
+                        <span>🔍</span> Key practical examples & syntax
+                    </button>
                 </div>
             </div>
             {% endif %}

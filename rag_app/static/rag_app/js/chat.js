@@ -87,6 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Welcome hero action chips click
+    document.querySelectorAll('.welcome-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const q = chip.dataset.query || chip.textContent.trim();
+            queryInput.value = q;
+            chatForm.dispatchEvent(new Event('submit'));
+        });
+    });
+
     // Toggle sources helper
     function setupSourceToggles(container) {
         container.querySelectorAll('.citation-toggle-btn').forEach(btn => {
@@ -188,6 +197,11 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const query = queryInput.value.trim();
         if (!query) return;
+
+        const welcomeHero = document.getElementById('chat-welcome-hero');
+        if (welcomeHero) {
+            welcomeHero.remove();
+        }
 
         appendMessage('user', query);
         queryInput.value = '';

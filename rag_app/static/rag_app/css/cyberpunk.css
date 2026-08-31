@@ -376,6 +376,70 @@ html, body {
   gap: 1.2rem;
 }
 
+/* Hero Welcome State when chat is empty */
+.chat-welcome-hero {
+  margin: auto;
+  max-width: 580px;
+  text-align: center;
+  padding: 2.2rem 2rem;
+  background: rgba(14, 20, 32, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.08);
+  border-radius: 6px;
+  animation: fadeIn 0.3s ease;
+}
+
+.welcome-icon {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+
+.welcome-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--text-bright);
+  margin: 0 0 0.5rem 0;
+  word-break: break-word;
+}
+
+.welcome-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 1.2rem 0;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.welcome-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--text-main);
+  padding: 0.6rem 1rem;
+  border-radius: 4px;
+  font-size: 0.84rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.welcome-chip:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  transform: translateX(3px);
+}
+
 /* Messages */
 .chat-msg {
   display: flex;
