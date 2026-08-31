@@ -209,6 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sendBtn.disabled = true;
 
         if (typingIndicator) {
+            chatHistory.appendChild(typingIndicator);
             typingIndicator.style.display = 'flex';
             scrollToBottom();
         }
@@ -261,7 +262,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             msgDiv.appendChild(avatar);
             msgDiv.appendChild(body);
-            chatHistory.appendChild(msgDiv);
+
+            if (typingIndicator) {
+                chatHistory.insertBefore(msgDiv, typingIndicator);
+            } else {
+                chatHistory.appendChild(msgDiv);
+            }
             scrollToBottom();
 
             // Stream reader loop
